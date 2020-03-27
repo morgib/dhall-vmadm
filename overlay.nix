@@ -15,7 +15,10 @@ let
     dhall-vmadm-generate = hpSuper.callPackage ./dhall-vmadm-generate.nix {};
 
     dhall = hpSuper.dhall_1_29_0;
-    prettyprinter = hpSuper.prettyprinter_1_6_0;
+  };
+
+  dhallExtend = dpSelf: dpSuper: {
+    dhall-vmadm = dpSuper.callPackage ./dhall-vmadm.nix { };
   };
 
 in
@@ -33,4 +36,6 @@ in
 
   dhall-vmadm-generate = self.haskellPackages.dhall-vmadm-generate;
   dhall-vmadm-source = self.callPackage ./dhall-vmadm-source.nix { };
+  dhallPackages = super.lib.fix' (super.lib.extends dhallExtend
+                   (self: super.dhallPackages // { callPackage = super.newScope self; }));
 }

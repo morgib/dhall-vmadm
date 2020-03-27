@@ -8,8 +8,8 @@ mkDerivation {
   version = "0.1.0.0";
   src = fetchgit {
     url = "https://github.com/morgib/dhall-vmadm-generate.git";
-    sha256 = "1rakm0c5ayfzdxm2i6b8wy25rx6mfd682ix146nsjbfmvp0imrjw";
-    rev = "b9863d46fee6219ac8e464a02c7e262ebca1ad48";
+    sha256 = "1qqmarkjibrc6qd679z173c15abdpzf4l45gyf20pm497iw94r2d";
+    rev = "5658bd5b44bac2a0ecef58566b822f1ba34cb1af";
     fetchSubmodules = true;
   };
   isLibrary = false;
