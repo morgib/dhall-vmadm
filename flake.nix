@@ -15,6 +15,8 @@
       in {
         inherit (pkgs) vmadm-proptable dhall-vmadm-generate dhall-vmadm-source;
       };
+      
+      defaultPackage.x86_64-linux = self.packages.x86_64-linux.dhall-vmadm-source;
 
       overlay = import ./overlay.nix;
 

@@ -1,41 +1,39 @@
 self: super:
-
-# `properExtend` comes from comments on https://github.com/NixOS/nixpkgs/issues/26561
-# by dhess, and ElvishJerrico
-# https://github.com/dhess/dhess-lib-nix/blob/f3f9660c4d86eabee40fd587b15c3535936857a3/overlays/haskell/lib.nix
-
 let
-  properExtend = hp: f: hp.override (oldArgs: {
-    overrides =
-    super.lib.composeExtensions (oldArgs.overrides or (_: _: {}))
-      f;
-  });
-
-  haskellExtend = hpSelf: hpSuper: {
+  haskellOverlay = hpSelf: hpSuper: {
     dhall-vmadm-generate = hpSuper.callPackage ./dhall-vmadm-generate {};
 
     #dhall = hpSuper.dhall_1_29_0;
   };
 
-  dhallExtend = dpSelf: dpSuper: {
+  dhallOverlay = dpSelf: dpSuper: {
     dhall-vmadm = dpSuper.callPackage ./dhall-vmadm.nix { };
   };
-
 in
-
-{ 
-  vmadm-proptable = super.callPackage ./vmadm-proptable.nix { };
-
-  haskellPackages = properExtend super.haskellPackages haskellExtend;
-
-  haskell = (super.haskell or {}) // {
-    lib = (super.haskell.lib or {}) // {
-      inherit properExtend;
+{
+  # Method of overriding copied from
+  # https://github.com/NixOS/nixpkgs/issues/101580#issuecomment-716086458
+  haskell = super.haskell // {
+    packages = super.haskell.packages // {
+      ghc8107 =
+        (
+          super.haskell.packages.ghc8107.override {
+            ghc = super.haskell.compiler.ghc8107.overrideAttrs (
+              prev: {
+                preConfigure = (prev.preConfigure or "") +
+                  ''
+                    sed -ie 's/^.*printf.*HAVE_FLOCK/#\0/' libraries/base/configure
+                    sed -ie 's/^.*printf.*HAVE_OFD_LOCKING/#\0/' libraries/base/configure
+                  '';
+              }
+            );
+          }
+        ).extend haskellOverlay;
     };
   };
-
+  vmadm-proptable = super.callPackage ./vmadm-proptable.nix { };
   dhall-vmadm-generate = self.haskellPackages.dhall-vmadm-generate;
   dhall-vmadm-source = self.callPackage ./dhall-vmadm-source.nix { };
-  dhallPackages = super.lib.fix' (super.lib.extends dhallExtend
+  dhallPackages = super.lib.fix' (super.lib.extends dhallOverlay
                    (self: super.dhallPackages // { callPackage = super.newScope self; }));
 }
