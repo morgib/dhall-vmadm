@@ -10,7 +10,11 @@ module Payload.Dhall.Type
   )
 where
 
-import           Dhall.Core                     ( Expr(..) )
+import           Dhall.Core                     ( Expr(..)
+                                                , RecordField(..)
+                                                , makeRecordField 
+                                                , makeFieldSelection
+                                                )
 import qualified Dhall.Map                     as Map
 import           Data.Void                      ( Void )
 import qualified Data.HashMap.Strict           as HM
@@ -63,15 +67,15 @@ allSources =
 setNested
   :: [T.Text]
   -> T.Text
-  -> Expr s a
-  -> Map.Map T.Text (Expr s a)
-  -> Map.Map T.Text (Expr s a)
+  -> RecordField s a
+  -> Map.Map T.Text (RecordField s a)
+  -> Map.Map T.Text (RecordField s a)
 setNested []             key value top = Map.insert key value top
 setNested (child : path) key value top = case Map.lookup child top of
   Nothing ->
-    Map.insert child (RecordLit $ setNested path key value Map.empty) top
-  Just (RecordLit childMap) ->
-    Map.insert child (RecordLit $ setNested path key value childMap) top
+    Map.insert child (makeRecordField . RecordLit $ setNested path key value Map.empty) top
+  Just (RecordField _ (RecordLit childMap) _ _) ->
+    Map.insert child (makeRecordField . RecordLit $ setNested path key value childMap) top
   Just _ ->
     error
       $  "called setNested with a child key "
@@ -84,16 +88,16 @@ mkPackageDotDhall locs = (PackageDotDhall, RecordLit top)
   top = foldr insertLocation Map.empty locs
   insertLocation
     :: PackageFile
-    -> Map.Map T.Text (Expr Void PackageFile)
-    -> Map.Map T.Text (Expr Void PackageFile)
+    -> Map.Map T.Text (RecordField Void PackageFile)
+    -> Map.Map T.Text (RecordField Void PackageFile)
   insertLocation loc = case loc of
     PayloadFile (P.Targetlike brand action) ->
-      setNested [brandLabel brand, actionLabel action] "Payload" (Embed loc)
+      setNested [brandLabel brand, actionLabel action] "Payload" (makeRecordField $ Embed loc)
     SubObjFile (P.Targetlike brand action) objId subAct -> setNested
       [brandLabel brand, actionLabel action, objId]
       (subActionLabel subAct)
-      (Embed loc)
-    SimpleFile simp -> setNested [] (simpleLabel simp) (Embed loc)
+      (makeRecordField $ Embed loc)
+    SimpleFile simp -> setNested [] (simpleLabel simp) (makeRecordField $ Embed loc)
     PackageDotDhall -> id
   brandLabel = \case
     P.Joyent        -> "joyent"
@@ -127,9 +131,9 @@ payloadSource :: P.Target -> [PropDesc] -> Source PackageFile PackageFile
 payloadSource target =
   (PayloadFile target, ) . Record . Map.fromList . map procProp
  where
-  procProp :: PropDesc -> (T.Text, Expr Void PackageFile)
+  procProp :: PropDesc -> (T.Text, RecordField Void PackageFile)
   procProp p =
-    propDescName . propName &&& optionalize p . mkPropType target $ p
+    propDescName . propName &&& makeRecordField . optionalize p . mkPropType target $ p
   optionalize PropDesc { isRequired } = if isRequired then id else App Optional
 
 -- | Produce sources for the given subobjects
@@ -145,9 +149,9 @@ subObjectSources target =
  where
   tagSubObj subObjId = map (first (subObjId, ))
   subObjFileName (SubObjectId label) subAct = SubObjFile target label subAct
-  procSubProp :: SubPropDesc -> (T.Text, Expr Void PackageFile)
+  procSubProp :: SubPropDesc -> (T.Text, RecordField Void PackageFile)
   procSubProp p =
-    subPropDescName . subPropName &&& optionalize p . mkSubPropType $ p
+    subPropDescName . subPropName &&& makeRecordField . optionalize p . mkSubPropType $ p
   optionalize SubPropDesc { subIsRequired } =
     if subIsRequired then id else App Optional
 
@@ -161,7 +165,7 @@ mkPropType curTarget PropDesc { propType, crudDesc } = case propType of
   SimpleType P.FlatObject -> Embed $ SimpleFile FlatObject
   SimpleType P.List       -> Embed $ SimpleFile SimpleList
   DerivedType (SubObjectId objLabel) ->
-    App List . flip Field "Type" . Embed $ SubObjFile curTarget
+    App List . flip Field (makeFieldSelection "Type") . Embed $ SubObjFile curTarget
                                                       objLabel
                                                       (subAction crudDesc)
   SimpleType P.ObjectArray -> Union $ Map.singleton "ObjectArray" Nothing
@@ -196,9 +200,9 @@ mkSubPropType SubPropDesc { subPropType } = case subPropType of
 -- top level optionals
 defaultOptionals :: Expr Void a -> Expr Void a
 defaultOptionals (Record kv) = RecordLit $ Map.fromList
-  [("Type", Record kv), ("default", RecordLit (Map.mapMaybe toDefault kv))]
+  [("Type", makeRecordField $ Record kv), ("default", makeRecordField . RecordLit $ (Map.mapMaybe toDefault kv))]
  where
-  toDefault (App Optional t) = Just (App None t)
+  toDefault (RecordField _ (App Optional t) _ _) = Just . makeRecordField $ App None t
   toDefault _                = Nothing
 defaultOptionals x = x -- identity on non-record types
 
@@ -211,7 +215,7 @@ simpleList = Union $ Map.fromList
 -- | The type of an association list of some value type
 assocList :: Expr Void a -> Expr Void a
 assocList valueType =
-  App List $ Record . Map.fromList $ [("mapKey", Text), ("mapValue", valueType)]
+  App List $ Record . Map.fromList $ [("mapKey", makeRecordField Text), ("mapValue", makeRecordField valueType)]
 
 -- | The value type used by association lists
 flatValue :: Expr Void a

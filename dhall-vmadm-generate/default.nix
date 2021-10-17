@@ -1,4 +1,4 @@
-{ mkDerivation, aeson, attoparsec, base, bytestring, dhall
+{ mkDerivation, lib, aeson, attoparsec, base, bytestring, dhall
 , directory, filepath, hashable, lens, pretty-simple, prettyprinter
 , prettyprinter-ansi-terminal, stdenv, text, unordered-containers
 }:
@@ -14,5 +14,5 @@ mkDerivation {
     unordered-containers
   ];
   description = "Generate Dhall interface for SmartOS vmadm";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }

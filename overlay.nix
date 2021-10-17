@@ -12,9 +12,9 @@ let
   });
 
   haskellExtend = hpSelf: hpSuper: {
-    dhall-vmadm-generate = hpSuper.callPackage ./dhall-vmadm-generate.nix {};
+    dhall-vmadm-generate = hpSuper.callPackage ./dhall-vmadm-generate {};
 
-    dhall = hpSuper.dhall_1_29_0;
+    #dhall = hpSuper.dhall_1_29_0;
   };
 
   dhallExtend = dpSelf: dpSuper: {
